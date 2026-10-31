@@ -1,0 +1,186 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with authentication and team association",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256, "format": "email" },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "role": { "type": "string", "enum": ["participant", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "displayName", "role", "createdAt"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrators recognized by the system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256, "format": "email" },
+        "addedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "RoundConfig": {
+      "title": "RoundConfig",
+      "description": "Hackathon round configuration, schedule, tasks definition, and penalty parameters",
+      "type": "object",
+      "properties": {
+        "roundStart": { "type": "string", "format": "date-time" },
+        "roundEnd": { "type": "string", "format": "date-time" },
+        "isPaused": { "type": "boolean" },
+        "penalties": { "type": "object" },
+        "tasks": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["roundStart", "roundEnd", "penalties", "tasks"]
+    },
+    "Team": {
+      "title": "Team",
+      "description": "Hackathon team state, members, scoring, and lifecycle",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 50 },
+        "joinCode": { "type": "string", "minLength": 6, "maxLength": 6, "pattern": "^[A-Z0-9]{6}$" },
+        "captainId": { "type": "string", "maxLength": 128 },
+        "memberIds": { "type": "array" },
+        "members": { "type": "array" },
+        "mode": { "type": "string", "enum": ["NONE", "SEQUENCE", "FREE"] },
+        "state": { "type": "string", "enum": ["LOBBY", "MODE_SELECT", "RUNNING", "FINISHED", "TIME_UP"] },
+        "currentTaskId": { "type": "string", "maxLength": 64 },
+        "score": { "type": "number" },
+        "totalActiveTimeMs": { "type": "number" },
+        "strikes": { "type": "number" },
+        "isFlagged": { "type": "boolean" },
+        "flagReason": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "joinCode", "captainId", "memberIds", "members", "mode", "state", "score", "totalActiveTimeMs", "strikes", "isFlagged", "createdAt", "updatedAt"]
+    },
+    "TeamTask": {
+      "title": "TeamTask",
+      "description": "Status and grading state of a specific task assigned to a team",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["LOCKED", "OFFERED", "STARTED", "SUBMITTED", "HOPPED"] },
+        "currentVariantIndex": { "type": "number" },
+        "variantId": { "type": "string", "maxLength": 64 },
+        "swapsUsed": { "type": "number" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "activeTimeMs": { "type": "number" },
+        "awardedPoints": { "type": "number" },
+        "gradedBy": { "type": "string", "maxLength": 256 },
+        "gradedAt": { "type": "string", "format": "date-time" },
+        "feedback": { "type": "string", "maxLength": 2000 }
+      },
+      "required": ["taskId", "status", "currentVariantIndex", "variantId", "swapsUsed", "activeTimeMs", "awardedPoints"]
+    },
+    "LedgerEntry": {
+      "title": "LedgerEntry",
+      "description": "Append-only immutable transaction logging all state transitions, penalties, and score adjustments",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "teamId": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "maxLength": 64 },
+        "deltaPoints": { "type": "number" },
+        "reason": { "type": "string", "maxLength": 500 },
+        "taskId": { "type": "string", "maxLength": 64 },
+        "actorId": { "type": "string", "maxLength": 128 },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object" }
+      },
+      "required": ["id", "teamId", "type", "deltaPoints", "reason", "actorId", "timestamp"]
+    },
+    "AntiCheatEvent": {
+      "title": "AntiCheatEvent",
+      "description": "Client-reported focus, visibility, and tab change events verified and stamped by server",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "eventType": { "type": "string", "enum": ["visibilitychange", "blur", "focus", "fullscreenchange", "paste", "strike_applied"] },
+        "clientSequence": { "type": "number" },
+        "clientTimestamp": { "type": "number" },
+        "serverTimestamp": { "type": "string", "format": "date-time" },
+        "awayDurationSeconds": { "type": "number" },
+        "isStrike": { "type": "boolean" },
+        "totalStrikesNow": { "type": "number" },
+        "teamFlagged": { "type": "boolean" },
+        "userId": { "type": "string", "maxLength": 128 },
+        "userEmail": { "type": "string", "maxLength": 256 }
+      },
+      "required": ["eventType", "clientSequence", "clientTimestamp", "serverTimestamp", "isStrike", "totalStrikesNow", "userId"]
+    },
+    "AdminRubric": {
+      "title": "AdminRubric",
+      "description": "Confidential grading rubrics and answer keys accessible only to system administrators",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string", "maxLength": 64 },
+        "rubric": { "type": "string", "maxLength": 10000 },
+        "solutionKey": { "type": "string", "maxLength": 10000 },
+        "gradingCriteria": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["taskId", "rubric", "solutionKey"]
+    },
+    "LeaderboardSnapshot": {
+      "title": "LeaderboardSnapshot",
+      "description": "Public aggregated leaderboard containing sanitized scores and active completion times",
+      "type": "object",
+      "properties": {
+        "teams": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teams", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile records indexed by auth UID"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/Admin" },
+      "description": "Designated administrator identity documents"
+    },
+    "/config/{configId}": {
+      "schema": { "$ref": "#/entities/RoundConfig" },
+      "description": "Global round configurations, task definitions, and penalties"
+    },
+    "/teams/{teamId}": {
+      "schema": { "$ref": "#/entities/Team" },
+      "description": "Team state, members, current status, and accumulated scores"
+    },
+    "/teams/{teamId}/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/TeamTask" },
+      "description": "Subcollection of per-team task statuses and awarded points"
+    },
+    "/teams/{teamId}/ledger/{ledgerId}": {
+      "schema": { "$ref": "#/entities/LedgerEntry" },
+      "description": "Append-only immutable audit ledger of score penalties and state transitions"
+    },
+    "/teams/{teamId}/antiCheatEvents/{eventId}": {
+      "schema": { "$ref": "#/entities/AntiCheatEvent" },
+      "description": "Subcollection of verified client anti-cheat telemetry and strikes"
+    },
+    "/adminRubrics/{taskId}": {
+      "schema": { "$ref": "#/entities/AdminRubric" },
+      "description": "Admin-only confidential answer rubrics and grading solutions"
+    },
+    "/leaderboard/{snapshotId}": {
+      "schema": { "$ref": "#/entities/LeaderboardSnapshot" },
+      "description": "Real-time publicly readable leaderboard rankings for all participants"
+    }
+  }
+}

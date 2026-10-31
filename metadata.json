@@ -1,0 +1,7 @@
+{
+  "name": "HackArena - Team Hackathon Engine",
+  "description": "Full-stack real-time team hackathon platform with server-authoritative state machine, anti-cheat monitoring, and admin grading.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

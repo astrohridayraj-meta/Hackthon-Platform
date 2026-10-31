@@ -1,0 +1,139 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // GLOBAL SECURITY GUARDS & PRIMITIVES
+    // =========================================================================
+
+    // Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isTeamMember(teamId) {
+      return isSignedIn() && (
+        request.auth.uid in get(/databases/$(database)/documents/teams/$(teamId)).data.memberIds
+      );
+    }
+
+    // =========================================================================
+    // USERS COLLECTION
+    // Users can read only their own profile; admins can inspect all users.
+    // Client direct writes are strictly disabled; created/updated via server Admin SDK.
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // ADMINS COLLECTION
+    // Read allowed exclusively for verified administrators.
+    // Direct client mutation is forbidden.
+    // =========================================================================
+    match /admins/{adminId} {
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // ROUND CONFIGURATION COLLECTION
+    // Global parameters: roundStart, roundEnd, tasks definitions, penalties.
+    // Readable by all authenticated participants for live UI sync.
+    // Client direct writes are strictly forbidden; configured via server Admin endpoints.
+    // =========================================================================
+    match /config/{configId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // TEAMS COLLECTION
+    // Participants can ONLY read their own team document.
+    // Admins can read and list all teams for the live dashboard.
+    // Direct writes are BLOCKED (allow write: if false).
+    // All team creations, joins, mode selections, and state transitions
+    // must pass through server endpoints enforcing the state machine.
+    // =========================================================================
+    match /teams/{teamId} {
+      allow get: if isSignedIn() && (
+        request.auth.uid in resource.data.memberIds || isAdmin()
+      );
+      allow list: if isAdmin();
+      allow write: if false;
+
+      // =======================================================================
+      // TEAM SUBCOLLECTIONS: TASKS
+      // Status (LOCKED, OFFERED, STARTED, SUBMITTED, HOPPED), active timers, scores.
+      // Accessible only to members of this team or admins.
+      // Client direct writes are strictly blocked; transitioned via server endpoints.
+      // =======================================================================
+      match /tasks/{taskId} {
+        allow get: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow list: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow write: if false;
+      }
+
+      // =======================================================================
+      // TEAM SUBCOLLECTIONS: APPEND-ONLY LEDGER
+      // Audit log of state transitions, penalties, and score adjustments.
+      // Readable by team members and admins; immutable from client SDK.
+      // =======================================================================
+      match /ledger/{ledgerId} {
+        allow get: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow list: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow write: if false;
+      }
+
+      // =======================================================================
+      // TEAM SUBCOLLECTIONS: ANTI-CHEAT EVENTS
+      // Tab blur/focus, visibility changes, paste, and strikes history.
+      // Direct writes blocked to prevent client tampering with strikes/sequences.
+      // Written exclusively via server endpoint which stamps server timestamps.
+      // =======================================================================
+      match /antiCheatEvents/{eventId} {
+        allow get: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow list: if isSignedIn() && (isTeamMember(teamId) || isAdmin());
+        allow write: if false;
+      }
+    }
+
+    // =========================================================================
+    // ADMIN-ONLY RUBRICS & ANSWER KEYS
+    // Secret solutions, grading criteria, and answer keys.
+    // STRICTLY restricted to Admins. Participants have ZERO access.
+    // =========================================================================
+    match /adminRubrics/{taskId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // =========================================================================
+    // LEADERBOARD SNAPSHOT
+    // Sanitized, aggregated scores and active times for all participants to see.
+    // Writeable only by server background synchronization.
+    // =========================================================================
+    match /leaderboard/{snapshotId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow write: if false;
+    }
+  }
+}
